@@ -252,7 +252,7 @@ jobs:
               # Clean restart to ensure the new resolved symlink path is picked up perfectly by PM2
               pm2 delete Mediva-App
             fi
-            pm2 start deploy/ecosystem.config.js --env production
+            pm2 start deploy/ecosystem.config.js --env production || pm2 start deploy/ecosystem.config.js --env production
 
             # Save PM2 process list to persist after server reboot
             pm2 save

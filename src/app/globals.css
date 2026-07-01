@@ -1,0 +1,8 @@
+@import 'tailwindcss' source(none);
+@source '../**/*.{js,ts,jsx,tsx}';
+
+/* Additional global overrides can go here */
+body {
+  margin: 0;
+  padding: 0;
+}

@@ -1,17 +1,8 @@
-// src/app/lib/api.ts
+const API_BASE_URL = '/api/v1';
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ||
-  "http://localhost:3001/api/v1";
+type ApiMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
-type ApiMethod =
-  | "GET"
-  | "POST"
-  | "PUT"
-  | "PATCH"
-  | "DELETE";
-
-interface ApiOptions extends RequestInit {
+interface ApiOptions extends Omit<RequestInit, 'body'> {
   method?: ApiMethod;
   body?: unknown;
 }
@@ -23,16 +14,16 @@ interface ApiErrorResponse {
 
 async function request<T>(
   endpoint: string,
-  options: ApiOptions = {}
+  options: ApiOptions = {},
 ): Promise<T> {
   try {
-    const token = localStorage.getItem("token");
+    const token =
+      typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 
     const headers: HeadersInit = {
       ...(options.body
         ? {
-            "Content-Type":
-              "application/json",
+            'Content-Type': 'application/json',
           }
         : {}),
 
@@ -45,152 +36,63 @@ async function request<T>(
       ...(options.headers || {}),
     };
 
-    const response = await fetch(
-      `${API_BASE_URL}${endpoint}`,
-      {
-        ...options,
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      ...options,
+      headers,
+      body:
+        typeof options.body === 'string'
+          ? options.body
+          : options.body
+            ? JSON.stringify(options.body)
+            : undefined,
+    });
 
-        headers,
-
-        body: options.body
-          ? JSON.stringify(options.body)
-          : undefined,
-      }
-    );
-
-    /*
-    =====================================
-    HANDLE RESPONSE
-    =====================================
-    */
-
-    const contentType =
-      response.headers.get(
-        "content-type"
-      ) || "";
-
-    const isJson =
-      contentType.includes(
-        "application/json"
-      );
-
-    const responseData = isJson
-      ? await response.json()
-      : await response.text();
-
-    /*
-    =====================================
-    HANDLE ERROR
-    =====================================
-    */
+    const contentType = response.headers.get('content-type') || '';
+    const isJson = contentType.includes('application/json');
+    const responseData = isJson ? await response.json() : await response.text();
 
     if (!response.ok) {
-      const errorData =
-        responseData as ApiErrorResponse;
-
+      const errorData = responseData as ApiErrorResponse;
       throw new Error(
         errorData?.message ||
           errorData?.error ||
-          `HTTP Error ${response.status}`
+          `HTTP Error ${response.status}`,
       );
     }
 
     return responseData as T;
   } catch (error) {
-    console.error(
-      "API REQUEST ERROR:",
-      error
-    );
-
+    console.error('API REQUEST ERROR:', error);
     throw error;
   }
 }
 
-/*
-=====================================
-GET
-=====================================
-*/
-
-export async function apiGet<T>(
-  endpoint: string
-): Promise<T> {
-  return request<T>(endpoint, {
-    method: "GET",
-  });
+export async function apiGet<T>(endpoint: string): Promise<T> {
+  return request<T>(endpoint, { method: 'GET' });
 }
 
-/*
-=====================================
-POST
-=====================================
-*/
-
-export async function apiPost<T>(
-  endpoint: string,
-  body?: unknown
-): Promise<T> {
-  return request<T>(endpoint, {
-    method: "POST",
-    body,
-  });
+export async function apiPost<T>(endpoint: string, body?: unknown): Promise<T> {
+  return request<T>(endpoint, { method: 'POST', body });
 }
 
-/*
-=====================================
-PUT
-=====================================
-*/
-
-export async function apiPut<T>(
-  endpoint: string,
-  body?: unknown
-): Promise<T> {
-  return request<T>(endpoint, {
-    method: "PUT",
-    body,
-  });
+export async function apiPut<T>(endpoint: string, body?: unknown): Promise<T> {
+  return request<T>(endpoint, { method: 'PUT', body });
 }
-
-/*
-=====================================
-PATCH
-=====================================
-*/
 
 export async function apiPatch<T>(
   endpoint: string,
-  body?: unknown
+  body?: unknown,
 ): Promise<T> {
-  return request<T>(endpoint, {
-    method: "PATCH",
-    body,
-  });
+  return request<T>(endpoint, { method: 'PATCH', body });
 }
 
-/*
-=====================================
-DELETE
-=====================================
-*/
-
-export async function apiDelete<T>(
-  endpoint: string
-): Promise<T> {
-  return request<T>(endpoint, {
-    method: "DELETE",
-  });
+export async function apiDelete<T>(endpoint: string): Promise<T> {
+  return request<T>(endpoint, { method: 'DELETE' });
 }
-
-/*
-=====================================
-DEFAULT FETCH
-=====================================
-*/
 
 export async function apiFetch<T>(
   endpoint: string,
-  options?: ApiOptions
+  options?: ApiOptions,
 ): Promise<T> {
   return request<T>(endpoint, options);
 }

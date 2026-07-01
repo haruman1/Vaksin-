@@ -239,18 +239,18 @@ jobs:
             # We execute PM2 from the 'current' symlink directory to make sure it loads active paths
             cd $DEPLOY_DIR/current
 
-            # Stop and delete old conflicting 'simpatik' PM2 process if active
-            if pm2 describe simpatik > /dev/null 2>&1; then
-              echo "🛑 Menghentikan dan menghapus proses PM2 lama 'simpatik' yang bentrok..."
-              pm2 stop simpatik
-              pm2 delete simpatik
+            # Stop and delete old conflicting 'Mediva-App' PM2 process if active
+            if pm2 describe Mediva-App > /dev/null 2>&1; then
+              echo "🛑 Menghentikan dan menghapus proses PM2 lama 'Mediva-App' yang bentrok..."
+              pm2 stop Mediva-App
+              pm2 delete Mediva-App
             fi
 
             # Zero-downtime PM2 reload or startup
             echo "🚀 Merestart aplikasi Next.js PM2 dari direktori rilis aktif..."
-            if pm2 describe simpatik-baru-nextjs > /dev/null 2>&1; then
+            if pm2 describe Mediva-App > /dev/null 2>&1; then
               # Clean restart to ensure the new resolved symlink path is picked up perfectly by PM2
-              pm2 delete simpatik-baru-nextjs
+              pm2 delete Mediva-App
             fi
             pm2 start deploy/ecosystem.config.js --env production
 

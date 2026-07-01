@@ -1,0 +1,280 @@
+name: Perbekes V {VERSION}
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Pilih aksi: deploy (kirim rilis baru) atau rollback (mundur ke versi sebelumnya)'
+        required: true
+        default: 'deploy'
+        type: choice
+        options:
+          - deploy
+          - rollback
+      rollback_version:
+        description: 'Nomor versi rollback (contoh: 12, hanya diisi jika memilih aksi rollback)'
+        required: false
+        default: ''
+        type: string
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        if: ${{ github.event.inputs.action != 'rollback' }}
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        if: ${{ github.event.inputs.action != 'rollback' }}
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        if: ${{ github.event.inputs.action != 'rollback' }}
+        run: npm ci
+
+      - name: Build Next.js Application
+        if: ${{ github.event.inputs.action != 'rollback' }}
+        run: npm run build
+        env:
+          NODE_ENV: ${{ secrets.NODE_ENV }}
+          DB_HOST: ${{ secrets.DB_HOST }},
+          DB_USER: ${{ secrets.DB_USER }},
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }},
+          DB_NAME: ${{ secrets.DB_NAME }},
+          DB_PORT: ${{ secrets.DB_PORT }},
+          DB_HOST_timker4: ${{ secrets.DB_HOST_timker4 }},
+          DB_USER_timker4: ${{ secrets.DB_USER_timker4 }},
+          DB_PASSWORD_timker4: ${{ secrets.DB_PASSWORD_timker4 }},
+          DB_NAME_timker4: ${{ secrets.DB_NAME_timker4 }},
+          DB_PORT_timker4: ${{ secrets.DB_PORT_timker4 }},
+          DB_HOST_sso: ${{ secrets.DB_HOST_sso }},
+          DB_USER_sso: ${{ secrets.DB_USER_sso }},
+          DB_PASSWORD_sso: ${{ secrets.DB_PASSWORD_sso }},
+          DB_NAME_sso: ${{ secrets.DB_NAME_sso }},
+          DB_PORT_sso: ${{ secrets.DB_PORT_sso }},
+
+          JWT_SECRET: ${{ secrets.JWT_SECRET }},
+          NEXT_TELEMETRY_DISABLED: 1
+          NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: ${{ secrets.NEXT_SERVER_ACTIONS_ENCRYPTION_KEY }}
+          GIT_SHA: ${{ github.sha }}
+
+      - name: Compress Build Files for Fast Transfer
+        if: ${{ github.event.inputs.action != 'rollback' }}
+        run: |
+          tar -czf release-v${{ github.run_number }}.tar.gz \
+            .next \
+            deploy \
+            src/lib \
+            package.json \
+            package-lock.json \
+            next.config.ts \
+            tsconfig.json
+
+      - name: Copy Archive to aaPanel VPS via SFTP/SCP
+        if: ${{ github.event.inputs.action != 'rollback' }}
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          source: 'release-v${{ github.run_number }}.tar.gz'
+          target: ${{ secrets.DEPLOY_PATH }}s
+
+      - name: Execute Remote SSH Commands (Deploy or Rollback)
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script: |
+            # Prepend NVM Node.js and PM2 binaries to PATH for non-interactive SSH shells
+            export PATH="/www/server/nvm/versions/node/v24.14.0/bin:$PATH"
+
+            # Verify active environment info
+            echo "🟢 Active Node Version: $(node -v)"
+            echo "🟢 Active NPM Version: $(npm -v)"
+            echo "🟢 Active PM2 Version: $(pm2 -v)"
+
+            # Navigate to aaPanel website deployment directory
+            DEPLOY_DIR="${{ secrets.DEPLOY_PATH }}"
+            cd $DEPLOY_DIR
+
+            # Ensure all required folders exist
+            mkdir -p releases
+            mkdir -p shared
+            mkdir -p shared/logs
+            mkdir -p shared/public/uploads
+            mkdir -p backups
+
+            ACTION="${{ github.event.inputs.action || 'deploy' }}"
+
+            if [ "$ACTION" = "rollback" ]; then
+              VERSION="${{ github.event.inputs.rollback_version }}"
+              if [ -z "$VERSION" ]; then
+                echo "❌ Error: Nomor versi rollback kosong! Masukkan nomor versi di input workflow_dispatch."
+                echo "Daftar versi rilis yang tersedia di VPS:"
+                ls -lh releases/
+                exit 1
+              fi
+
+              ROLLBACK_PATH="releases/v${VERSION}"
+
+              # Fallback: if folder does not exist, but backup tarball exists, recreate it
+              if [ ! -d "$ROLLBACK_PATH" ]; then
+                TARBALL="backups/release-v${VERSION}.tar.gz"
+                if [ -f "$TARBALL" ]; then
+                  echo "📦 Menemukan tarball backup di backups/. Mengekstrak ke $ROLLBACK_PATH..."
+                  mkdir -p $ROLLBACK_PATH
+                  tar -xzf $TARBALL -C $ROLLBACK_PATH
+
+                  # Re-establish shared symlinks for the extracted rollback
+                  echo "🔗 Menghubungkan symlink folder shared..."
+                  ln -sf $DEPLOY_DIR/shared/.env $ROLLBACK_PATH/.env
+                  rm -rf $ROLLBACK_PATH/logs
+                  ln -sf $DEPLOY_DIR/shared/logs $ROLLBACK_PATH/logs
+                  mkdir -p $ROLLBACK_PATH/public
+                  rm -rf $ROLLBACK_PATH/public/uploads
+                  ln -sf $DEPLOY_DIR/shared/public/uploads $ROLLBACK_PATH/public/uploads
+
+                  # Install production dependencies inside the rollback folder
+                  echo "⚡ Menginstal dependensi produksi untuk versi rollback..."
+                  if [ -d "current/node_modules" ]; then
+                    cp -rp current/node_modules $ROLLBACK_PATH/
+                  fi
+                  cd $ROLLBACK_PATH
+                  npm install --omit=dev
+                  cd $DEPLOY_DIR
+                else
+                  echo "❌ Error: Direktori rilis atau file backup untuk versi $VERSION tidak ditemukan!"
+                  echo "Daftar rilis yang ada di VPS:"
+                  ls -lh releases/
+                  exit 1
+                fi
+              fi
+
+              echo "🔄 Memulai Rollback ke Versi: v${VERSION}..."
+              # Atomically update current symlink
+              ln -sfn releases/v${VERSION} current
+              echo "✅ Rollback symlink ke v${VERSION} selesai!"
+
+            else
+              # Normal Deploy Action
+              RUN_NUMBER="${{ github.run_number }}"
+              TARBALL_NAME="release-v${RUN_NUMBER}.tar.gz"
+
+              if [ ! -f "$TARBALL_NAME" ]; then
+                echo "❌ Error: File tarball rilis $TARBALL_NAME tidak ditemukan di server!"
+                exit 1
+              fi
+
+              RELEASE_PATH="releases/v${RUN_NUMBER}"
+              echo "📂 Membuat folder rilis baru: $RELEASE_PATH"
+              mkdir -p $RELEASE_PATH
+
+              echo "📦 Mengekstrak rilis baru v${RUN_NUMBER}..."
+              tar -xzf $TARBALL_NAME -C $RELEASE_PATH
+
+              echo "💾 Menyimpan arsip rilis ke folder backups..."
+              mv $TARBALL_NAME backups/$TARBALL_NAME
+
+              # Smooth Migration: If old .env exists in DEPLOY_DIR but not in shared/.env, move it to shared
+              if [ -f ".env" ] && [ ! -f "shared/.env" ]; then
+                echo "📦 Memindahkan .env lama ke shared/.env..."
+                mv .env shared/.env
+              fi
+
+              # Smooth Migration: If old public/uploads exists in DEPLOY_DIR but not in shared/public/uploads, move files
+              if [ -d "public/uploads" ] && [ ! -L "public/uploads" ]; then
+                echo "📦 Memindahkan data upload lama ke shared/public/uploads..."
+                cp -rp public/uploads/* shared/public/uploads/ 2>/dev/null || true
+                rm -rf public/uploads
+              fi
+
+              # Smooth Migration: If old logs folder exists in DEPLOY_DIR, clean it
+              if [ -d "logs" ] && [ ! -L "logs" ]; then
+                rm -rf logs
+              fi
+
+              # Establish shared symlinks for the new release
+              echo "🔗 Menghubungkan symlink folder shared ke rilis baru..."
+              ln -sf $DEPLOY_DIR/shared/.env $RELEASE_PATH/.env
+              
+              rm -rf $RELEASE_PATH/logs
+              ln -sf $DEPLOY_DIR/shared/logs $RELEASE_PATH/logs
+              
+              mkdir -p $RELEASE_PATH/public
+              rm -rf $RELEASE_PATH/public/uploads
+              ln -sf $DEPLOY_DIR/shared/public/uploads $RELEASE_PATH/public/uploads
+
+              # Copy node_modules from current release to speed up installation
+              if [ -d "current/node_modules" ]; then
+                echo "📦 Menyalin node_modules dari rilis aktif untuk mempercepat instalasi..."
+                cp -rp current/node_modules $RELEASE_PATH/
+              fi
+
+              # Install production dependencies inside the new release
+              echo "⚡ Menginstal dependensi produksi di folder rilis baru..."  
+              cd $RELEASE_PATH
+              npm install --omit=dev
+              cd $DEPLOY_DIR
+
+              # Atomically update current symlink to the new release
+              echo "🔄 Mengarahkan symlink 'current' ke rilis baru..."
+              ln -sfn releases/v${RUN_NUMBER} current
+              echo "✅ Ekstraksi dan konfigurasi rilis baru v${RUN_NUMBER} selesai!"
+            fi
+
+            # PM2 Reload / Restart
+            # We execute PM2 from the 'current' symlink directory to make sure it loads active paths
+            cd $DEPLOY_DIR/current
+
+            # Stop and delete old conflicting 'simpatik' PM2 process if active
+            if pm2 describe simpatik > /dev/null 2>&1; then
+              echo "🛑 Menghentikan dan menghapus proses PM2 lama 'simpatik' yang bentrok..."
+              pm2 stop simpatik
+              pm2 delete simpatik
+            fi
+
+            # Zero-downtime PM2 reload or startup
+            echo "🚀 Merestart aplikasi Next.js PM2 dari direktori rilis aktif..."
+            if pm2 describe simpatik-baru-nextjs > /dev/null 2>&1; then
+              # Clean restart to ensure the new resolved symlink path is picked up perfectly by PM2
+              pm2 delete simpatik-baru-nextjs
+            fi
+            pm2 start deploy/ecosystem.config.js --env production
+
+            # Save PM2 process list to persist after server reboot
+            pm2 save
+
+            # Clear aaPanel Nginx proxy cache to ensure the new deployment is served immediately
+            echo "🧹 Membersihkan cache Nginx proxy di VPS..."
+            if [ -d "/www/server/nginx/proxy_cache_dir" ]; then
+              rm -rf /www/server/nginx/proxy_cache_dir/* 2>/dev/null || true
+              nginx -s reload 2>/dev/null || true
+              echo "✅ Cache Nginx proxy dibersihkan!"
+            fi
+
+
+            # Clean up old releases, leaving only the 5 most recent ones to save disk space
+            cd $DEPLOY_DIR/releases
+            echo "🧹 Membersihkan rilis lama, menyisakan 5 rilis terakhir..."
+            ls -dt v* 2>/dev/null | tail -n +6 | while read dir; do
+              if [ -n "$dir" ]; then
+                echo "Menghapus rilis lama: $dir"
+                rm -rf "$dir"
+              fi
+            done
+            cd $DEPLOY_DIR
+
+            echo "✅ Operasi $ACTION selesai dengan sukses!"

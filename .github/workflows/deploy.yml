@@ -1,4 +1,4 @@
-name: Perbekes V ${{ github.run_number }}
+name: Perbekes Deployment Workflow
 
 on:
   push:

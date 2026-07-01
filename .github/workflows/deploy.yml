@@ -1,4 +1,4 @@
-name: Perbekes V {VERSION}
+name: Perbekes V ${{ github.run_number }}
 
 on:
   push:
@@ -79,7 +79,7 @@ jobs:
             next.config.ts \
             tsconfig.json
 
-      - name: Copy Archive to aaPanel VPS via SFTP/SCP
+      - name: Copy Archive to aaPanel VPS via SFTP/SCP ${{ github.run_number }}
         if: ${{ github.event.inputs.action != 'rollback' }}
         uses: appleboy/scp-action@master
         with:

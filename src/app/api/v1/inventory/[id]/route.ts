@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { timker4 } from '@/lib/timker4Db';
+import { db } from '@/lib/mainDb';
 import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET!;
@@ -32,8 +32,8 @@ export async function PUT(
 
     if (userRole !== 'admin') {
       // Normal user: can only decrease stock, cannot change other fields.
-      const [currentRows] = await timker4.query(
-        `SELECT stock, wilayah, ${nameColumn} FROM ${tableName} WHERE id = ?`,
+      const [currentRows] = await db.query(
+        `SELECT stok as stock, 'pusat' as wilayah, ${nameColumn} FROM ${tableName} WHERE id = ?`,
         [id]
       );
       
@@ -42,7 +42,7 @@ export async function PUT(
         return NextResponse.json({ message: 'Item tidak ditemukan' }, { status: 404 });
       }
 
-      if (currentItem.wilayah !== userWilayah) {
+      if (currentItem.wilayah !== 'pusat' && currentItem.wilayah !== userWilayah) { // Mock wilayah logic
         return NextResponse.json({ message: 'Akses ditolak' }, { status: 403 });
       }
 
@@ -56,7 +56,6 @@ export async function PUT(
 
       if (quantityUsed > 0) {
         // Insert into inventory_movements
-        const { db } = await import('@/lib/mainDb');
         await db.query(
           `INSERT INTO inventory_movements (date, type, item, category, quantity, unit, source, destination, notes) 
            VALUES (NOW(), 'keluar', ?, ?, ?, ?, ?, ?, ?)`,
@@ -75,15 +74,15 @@ export async function PUT(
       const newStock = currentItem.stock - quantityUsed;
 
       // Only update the stock
-      await timker4.query(
-        `UPDATE ${tableName} SET stock = ? WHERE id = ?`,
+      await db.query(
+        `UPDATE ${tableName} SET stok = ? WHERE id = ?`,
         [newStock, id],
       );
     } else {
-      // Admin: can update all fields
-      await timker4.query(
-        `UPDATE ${tableName} SET no_urut = ?, ${nameColumn} = ?, satuan = ?, stock = ?, wilayah = ? WHERE id = ?`,
-        [noUrut ?? 0, name, unit, stock, wilayah || 'pusat', id],
+      // Admin: can update all fields (excluding no_urut and wilayah in new schema)
+      await db.query(
+        `UPDATE ${tableName} SET ${nameColumn} = ?, satuan = ?, stok = ? WHERE id = ?`,
+        [name, unit, stock, id],
       );
     }
 
@@ -121,19 +120,19 @@ export async function DELETE(
 
     const { id } = await params;
 
-    const [medicineRows] = await timker4.query(
+    const [medicineRows] = await db.query(
       `SELECT id FROM obat WHERE id = ? LIMIT 1`,
       [id],
     );
-    const [bmhpRows] = await timker4.query(
+    const [bmhpRows] = await db.query(
       `SELECT id FROM bmhp WHERE id = ? LIMIT 1`,
       [id],
     );
 
     if ((medicineRows as any[]).length > 0) {
-      await timker4.query(`DELETE FROM obat WHERE id = ?`, [id]);
+      await db.query(`DELETE FROM obat WHERE id = ?`, [id]);
     } else if ((bmhpRows as any[]).length > 0) {
-      await timker4.query(`DELETE FROM bmhp WHERE id = ?`, [id]);
+      await db.query(`DELETE FROM bmhp WHERE id = ?`, [id]);
     }
 
     return NextResponse.json({ message: 'Inventori berhasil dihapus' });

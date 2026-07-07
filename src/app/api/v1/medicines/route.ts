@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { timker4 } from '@/lib/timker4Db';
+import { db } from '@/lib/mainDb';
 
 export async function GET() {
   try {
-    const [rows] = await timker4.query(
-      `SELECT id, no_urut AS noUrut, nama_obat AS name, satuan AS unit, stock FROM obat WHERE wilayah = 'pusat' ORDER BY no_urut ASC, nama_obat ASC`,
+    const [rows] = await db.query(
+      `SELECT id, 0 AS noUrut, nama_obat AS name, satuan AS unit, stok as stock FROM obat ORDER BY nama_obat ASC`,
     );
     return NextResponse.json(rows);
   } catch (error) {

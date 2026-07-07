@@ -96,6 +96,7 @@ export default function InventoriPage() {
   const [formData, setFormData] = React.useState<StockForm>(initialForm);
   const [user, setUser] = React.useState<DecodedToken | null>(null);
   const [wilayahFilter, setWilayahFilter] = React.useState('semua');
+  const [categoryFilter, setCategoryFilter] = React.useState('semua');
 
   React.useEffect(() => {
     setUser(getUserFromToken());
@@ -124,13 +125,15 @@ export default function InventoriPage() {
       const matchWilayah =
         wilayahFilter === 'semua' ||
         (item.wilayah || 'pusat') === wilayahFilter;
-      return matchSearch && matchWilayah;
+      const matchCategory =
+        categoryFilter === 'semua' || item.category === categoryFilter;
+      return matchSearch && matchWilayah && matchCategory;
     });
-  }, [inventory, searchTerm, wilayahFilter]);
+  }, [inventory, searchTerm, wilayahFilter, categoryFilter]);
 
   React.useEffect(() => {
     setPage(0);
-  }, [searchTerm, wilayahFilter]);
+  }, [searchTerm, wilayahFilter, categoryFilter]);
 
   React.useEffect(() => {
     const maxPage = Math.max(
@@ -509,6 +512,17 @@ export default function InventoriPage() {
             },
           }}
         />
+        <TextField
+          select
+          size="small"
+          value={categoryFilter}
+          onChange={(e) => setCategoryFilter(e.target.value)}
+          sx={{ minWidth: 160 }}
+        >
+          <MenuItem value="semua">Semua Kategori</MenuItem>
+          <MenuItem value="obat">Obat</MenuItem>
+          <MenuItem value="bmhp">BMHP</MenuItem>
+        </TextField>
         {user?.wilayah === 'pusat' && (
           <TextField
             select

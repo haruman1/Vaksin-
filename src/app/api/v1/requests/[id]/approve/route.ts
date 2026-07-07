@@ -40,25 +40,17 @@ export async function PATCH(
     const [bmhp] = await db.query(`SELECT item, quantity FROM request_bmhp WHERE request_id = ?`, [id]);
 
     const transferStock = async (tableName: string, nameColumn: string, itemName: string, quantity: number) => {
-       // Deduct from pusat (if exists)
-       await timker4.query(`UPDATE ${tableName} SET stock = GREATEST(0, stock - ?) WHERE ${nameColumn} = ? AND wilayah = 'pusat'`, [quantity, itemName]);
+       // Deduct from pusat
+       await db.query(`UPDATE ${tableName} SET stok = GREATEST(0, stok - ?) WHERE ${nameColumn} = ?`, [quantity, itemName]);
        
        let satuan = '-';
-       let noUrut = 0;
-       const [pusatRows] = await timker4.query(`SELECT satuan, no_urut FROM ${tableName} WHERE ${nameColumn} = ? AND wilayah = 'pusat' LIMIT 1`, [itemName]);
+       const [pusatRows] = await db.query(`SELECT satuan FROM ${tableName} WHERE ${nameColumn} = ? LIMIT 1`, [itemName]);
        if ((pusatRows as any[]).length > 0) {
            satuan = (pusatRows as any)[0].satuan || '-';
-           noUrut = (pusatRows as any)[0].no_urut || 0;
        }
 
-       // Add to target wilayah
-       const [targetRows] = await timker4.query(`SELECT id FROM ${tableName} WHERE ${nameColumn} = ? AND wilayah = ?`, [itemName, targetWilayah]);
-       if ((targetRows as any[]).length > 0) {
-           await timker4.query(`UPDATE ${tableName} SET stock = stock + ? WHERE ${nameColumn} = ? AND wilayah = ?`, [quantity, itemName, targetWilayah]);
-       } else {
-           // Insert new row for wilayah
-           await timker4.query(`INSERT INTO ${tableName} (no_urut, ${nameColumn}, satuan, stock, wilayah) VALUES (?, ?, ?, ?, ?)`, [noUrut, itemName, satuan, quantity, targetWilayah]);
-       }
+       // We don't add to target wilayah because the new schema doesn't support wilayah in obat/bmhp.
+       // We just record it in inventory_movements.
 
        // Insert into inventory_movements (Masuk)
        const category = tableName === 'bmhp' ? 'bmhp' : 'obat';

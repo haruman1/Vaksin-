@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
-import { timker4 } from '@/lib/timker4Db';
+import { db } from '@/lib/mainDb';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 
@@ -25,18 +26,13 @@ export async function GET(req: Request) {
     let filterParams: any[] = [];
     
     // Admin or pusat sees all ONLY if their wilayah is pusat. Otherwise they only see their wilayah.
-    if (userWilayah !== 'pusat' && userWilayah) {
-      filterQuery = ' WHERE wilayah LIKE ?';
-      filterParams = [`${userWilayah}%`];
-    }
+    // Note: wilayah is removed from schema, ignoring filter for now.
 
-    const [medicines] = await timker4.query(
-      `SELECT id, no_urut AS noUrut, nama_obat AS name, satuan AS unit, stock, wilayah, 'obat' AS category FROM obat${filterQuery}`,
-      filterParams
+    const [medicines] = await db.query(
+      `SELECT id, 0 AS noUrut, nama_obat AS name, satuan AS unit, stok as stock, 'pusat' AS wilayah, 'obat' AS category FROM obat`
     );
-    const [bmhp] = await timker4.query(
-      `SELECT id, no_urut AS noUrut, nama_bmhp AS name, satuan AS unit, stock, wilayah, 'bmhp' AS category FROM bmhp${filterQuery}`,
-      filterParams
+    const [bmhp] = await db.query(
+      `SELECT id, 0 AS noUrut, nama_bmhp AS name, satuan AS unit, stok as stock, 'pusat' AS wilayah, 'bmhp' AS category FROM bmhp`
     );
 
     const combined = [...(medicines as any[]), ...(bmhp as any[])].sort(
@@ -76,19 +72,21 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { category = 'obat', name, unit, stock = 0, noUrut, wilayah } = body;
+    const { category = 'obat', name, unit, stock = 0 } = body;
     
-    const finalWilayah = (userRole === 'admin' && wilayah) ? wilayah : userWilayah;
-
     const tableName = category === 'bmhp' ? 'bmhp' : 'obat';
     const nameColumn = category === 'bmhp' ? 'nama_bmhp' : 'nama_obat';
+    const kodePrefix = category === 'bmhp' ? 'BMHP-' : 'OBAT-';
+    
+    const id = crypto.randomUUID();
+    const kode = kodePrefix + Math.floor(Math.random() * 1000000);
 
-    const [result] = await timker4.query(
-      `INSERT INTO ${tableName} (no_urut, ${nameColumn}, satuan, stock, wilayah) VALUES (?, ?, ?, ?, ?)`,
-      [noUrut ?? 0, name, unit, stock, finalWilayah],
+    await db.query(
+      `INSERT INTO ${tableName} (id, kode_${tableName}, ${nameColumn}, satuan, stok) VALUES (?, ?, ?, ?, ?)`,
+      [id, kode, name, unit, stock],
     );
 
-    return NextResponse.json({ id: (result as any).insertId }, { status: 201 });
+    return NextResponse.json({ id }, { status: 201 });
   } catch (error) {
     console.error('POST /api/v1/inventory error', error);
     return NextResponse.json(

@@ -58,12 +58,23 @@ export default function MainLayout({
   const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
 
   React.useEffect(() => {
+    // Check for SSO Token in URL
+    const params = new URLSearchParams(window.location.search);
+    const ssoToken = params.get('ssoToken');
+    if (ssoToken) {
+      localStorage.setItem('token', ssoToken);
+      // Clean the URL without refreshing
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
     // Only run on client
     const checkAuth = async () => {
       const { getUserFromToken } = await import('@/app/lib/auth');
       const currentUser = getUserFromToken();
       if (currentUser) {
         setUser(currentUser);
+      } else {
+        router.push('/login');
       }
     };
     checkAuth();

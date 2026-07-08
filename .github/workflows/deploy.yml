@@ -66,6 +66,7 @@ jobs:
           NEXT_TELEMETRY_DISABLED: 1
           NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: ${{ secrets.NEXT_SERVER_ACTIONS_ENCRYPTION_KEY }}
           GIT_SHA: ${{ github.sha }}
+          SYNC_TOKEN: ${{ secrets.SYNC_TOKEN }},
 
       - name: Compress Build Files for Fast Transfer
         if: ${{ github.event.inputs.action != 'rollback' }}

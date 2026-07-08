@@ -29,6 +29,7 @@ module.exports = {
         DB_PASSWORD: process.env.DB_PASSWORD,
         DB_NAME: process.env.DB_NAME,
         DB_PORT: process.env.DB_PORT,
+
         //    # =====================================
         // # DATABASE TIMKER
         // # =====================================
@@ -52,6 +53,7 @@ module.exports = {
         NEXT_SERVER_ACTIONS_ENCRYPTION_KEY:
           process.env.NEXT_SERVER_ACTIONS_ENCRYPTION_KEY,
         SESSION_SECRET: process.env.SESSION_SECRET,
+        SYNC_TOKEN: process.env.SYNC_TOKEN,
       },
 
       // Log formatting and tracking specs a

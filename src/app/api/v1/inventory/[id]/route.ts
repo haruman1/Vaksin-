@@ -30,7 +30,7 @@ export async function PUT(
     const tableName = category === 'bmhp' ? 'bmhp' : 'obat';
     const nameColumn = category === 'bmhp' ? 'nama_bmhp' : 'nama_obat';
 
-    if (userRole !== 'admin') {
+    if (userRole.toLowerCase() !== 'admin') {
       // Normal user: can only decrease stock, cannot change other fields.
       const [currentRows] = await db.query(
         `SELECT stok as stock, 'pusat' as wilayah, ${nameColumn} FROM ${tableName} WHERE id = ?`,
@@ -47,7 +47,7 @@ export async function PUT(
       }
 
       if (quantityUsed === undefined || quantityUsed < 0) {
-        return NextResponse.json({ message: 'Jumlah penggunaan tidak valid' }, { status: 400 });
+        return NextResponse.json({ message: `Jumlah penggunaan tidak valid (role: ${userRole}, qty: ${quantityUsed})` }, { status: 400 });
       }
 
       if (quantityUsed > currentItem.stock) {
@@ -114,7 +114,7 @@ export async function DELETE(
       }
     }
 
-    if (userRole !== 'admin') {
+    if (userRole.toLowerCase() !== 'admin') {
       return NextResponse.json({ message: 'Hanya admin yang dapat menghapus item' }, { status: 403 });
     }
 

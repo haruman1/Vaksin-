@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import * as React from 'react';
 import {
@@ -200,7 +200,7 @@ export default function InventoriPage() {
         notes: formData.notes,
       };
 
-      if (user?.role !== 'admin' && selectedItem) {
+      if (user?.role?.toLowerCase() !== 'admin' && selectedItem) {
         payload.quantityUsed = formData.stock;
       } else {
         payload.stock = formData.stock;
@@ -235,7 +235,7 @@ export default function InventoriPage() {
       noUrut: item.noUrut,
       name: item.name,
       unit: item.unit,
-      stock: user?.role === 'admin' ? Number(item.stock || 0) : 0,
+      stock: user?.role?.toLowerCase() === 'admin' ? Number(item.stock || 0) : 0,
       wilayah: item.wilayah || 'pusat',
     });
   };
@@ -309,7 +309,7 @@ export default function InventoriPage() {
             Sinkron dengan master stok obat dan BMHP dari database timker4
           </Typography>
         </Box>
-        {user?.role === 'admin' && (
+        {user?.role?.toLowerCase() === 'admin' && (
           <Box sx={{ display: 'flex', gap: 2 }}>
             <Button
               variant="outlined"
@@ -632,7 +632,7 @@ export default function InventoriPage() {
                           >
                             <Edit size={16} />
                           </IconButton>
-                          {user?.role === 'admin' && (
+                          {user?.role?.toLowerCase() === 'admin' && (
                             <IconButton
                               color="error"
                               size="small"
@@ -692,7 +692,7 @@ export default function InventoriPage() {
         >
           <Typography component="div" variant="h6" sx={{ fontWeight: 700 }}>
             {selectedItem
-              ? user?.role === 'admin'
+              ? user?.role?.toLowerCase() === 'admin'
                 ? 'Edit Item Inventori'
                 : 'Laporkan Penggunaan'
               : 'Tambah Item Inventori'}
@@ -717,7 +717,7 @@ export default function InventoriPage() {
                 value={formData.category}
                 label="Kategori"
                 onChange={(e) => handleChange('category', e.target.value)}
-                disabled={user?.role !== 'admin' && !!selectedItem}
+                disabled={user?.role?.toLowerCase() !== 'admin' && !!selectedItem}
               >
                 <MenuItem value="obat">Obat</MenuItem>
                 <MenuItem value="bmhp">BMHP</MenuItem>
@@ -725,7 +725,7 @@ export default function InventoriPage() {
             </FormControl>
 
             <Grid container spacing={2}>
-              {user?.role !== 'admin' && !selectedItem ? (
+              {user?.role?.toLowerCase() !== 'admin' && !selectedItem ? (
                 <Grid size={{ xs: 12 }}>
                   <Autocomplete
                     options={inventory.filter(
@@ -758,7 +758,7 @@ export default function InventoriPage() {
                       required
                       value={formData.noUrut}
                       onChange={(e) => handleChange('noUrut', e.target.value)}
-                      disabled={user?.role !== 'admin' && !!selectedItem}
+                      disabled={user?.role?.toLowerCase() !== 'admin' && !!selectedItem}
                     />
                   </Grid>
                   <Grid size={{ xs: 12, sm: 8 }}>
@@ -768,7 +768,7 @@ export default function InventoriPage() {
                       required
                       value={formData.name}
                       onChange={(e) => handleChange('name', e.target.value)}
-                      disabled={user?.role !== 'admin' && !!selectedItem}
+                      disabled={user?.role?.toLowerCase() !== 'admin' && !!selectedItem}
                     />
                   </Grid>
                   <Grid size={{ xs: 12, sm: 6 }}>
@@ -778,22 +778,22 @@ export default function InventoriPage() {
                       required
                       value={formData.unit}
                       onChange={(e) => handleChange('unit', e.target.value)}
-                      disabled={user?.role !== 'admin' && !!selectedItem}
+                      disabled={user?.role?.toLowerCase() !== 'admin' && !!selectedItem}
                     />
                   </Grid>
                 </>
               )}
-              {(!user || user?.role === 'admin' || selectedItem) && (
+              {(!user || user?.role?.toLowerCase() === 'admin' || selectedItem) && (
                 <Grid
                   size={{
                     xs: 12,
-                    sm: user?.role !== 'admin' && selectedItem ? 12 : 6,
+                    sm: user?.role?.toLowerCase() !== 'admin' && selectedItem ? 12 : 6,
                   }}
                 >
                   <TextField
                     fullWidth
                     label={
-                      user?.role !== 'admin' && selectedItem
+                      user?.role?.toLowerCase() !== 'admin' && selectedItem
                         ? 'Jumlah Pengeluaran'
                         : 'Stok'
                     }
@@ -804,7 +804,7 @@ export default function InventoriPage() {
                     slotProps={{
                       htmlInput: {
                         max:
-                          user?.role !== 'admin'
+                          user?.role?.toLowerCase() !== 'admin'
                             ? selectedItem?.stock
                             : undefined,
                         min: 0,
@@ -813,7 +813,7 @@ export default function InventoriPage() {
                   />
                 </Grid>
               )}
-              {user?.role === 'admin' && (
+              {user?.role?.toLowerCase() === 'admin' && (
                 <Grid size={{ xs: 12, sm: 12 }}>
                   <FormControl fullWidth required>
                     <InputLabel>Wilayah</InputLabel>
@@ -841,7 +841,7 @@ export default function InventoriPage() {
                   </FormControl>
                 </Grid>
               )}
-              {user?.role !== 'admin' && selectedItem && (
+              {user?.role?.toLowerCase() !== 'admin' && selectedItem && (
                 <Grid size={{ xs: 12 }}>
                   <TextField
                     fullWidth
@@ -869,7 +869,7 @@ export default function InventoriPage() {
             </Button>
             <Button type="submit" variant="contained" color="primary">
               {selectedItem
-                ? user?.role === 'admin'
+                ? user?.role?.toLowerCase() === 'admin'
                   ? 'Update Item'
                   : 'Simpan'
                 : 'Simpan Item'}
